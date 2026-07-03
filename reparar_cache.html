@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Reparar Caché — Despensa Económica</title>
+<style>
+  body{font-family:sans-serif;background:#f0fdf4;color:#052e16;padding:24px;max-width:480px;margin:0 auto;}
+  h1{font-size:20px;margin-bottom:6px;}
+  p{font-size:14px;color:#4b7a5a;line-height:1.5;}
+  button{width:100%;padding:16px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-weight:900;font-size:15px;cursor:pointer;margin-top:16px;}
+  button:disabled{background:#ccc;}
+  .log{background:#fff;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;margin-top:16px;font-size:13px;white-space:pre-wrap;font-family:monospace;min-height:40px;}
+  .warn{background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:12px 14px;font-size:13px;margin-top:14px;color:#92400e;}
+</style>
+</head>
+<body>
+  <h1>🛠️ Reparar caché local de productos</h1>
+  <p>Esta herramienta borra únicamente la copia local (guardada en este teléfono/navegador) de tu lista de productos. No borra nada en Supabase. Después de usarla, abre <b>index.html</b> normalmente y la app descargará tu inventario limpio directo desde Supabase.</p>
+  <div class="warn">Úsala solo una vez, después de haber limpiado los productos duplicados en Supabase (ver instrucciones que te dieron aparte). Ciérrala y no la vuelvas a usar salvo que te lo indiquen.</div>
+  <button id="btn" onclick="reparar()">🧹 Borrar caché local de productos</button>
+  <div class="log" id="log">Esperando…</div>
+
+<script>
+const DB_NAME='DespensaEconomicaDB', KV_STORE='kv';
+function log(m){document.getElementById('log').textContent+= (document.getElementById('log').textContent==='Esperando…'?'':'\n')+m;}
+async function reparar(){
+  const btn=document.getElementById('btn');
+  btn.disabled=true;
+  document.getElementById('log').textContent='';
+  try{
+    log('Abriendo base de datos local…');
+    const db = await new Promise((res,rej)=>{
+      const r=indexedDB.open(DB_NAME);
+      r.onsuccess=e=>res(e.target.result);
+      r.onerror=e=>rej(e.target.error);
+    });
+    if(!db.objectStoreNames.contains(KV_STORE)){
+      log('No se encontró almacenamiento local — no hay nada que reparar.');
+      btn.disabled=false;return;
+    }
+    log('Borrando caché de productos (vpos_productos)…');
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(KV_STORE,'readwrite');
+      tx.objectStore(KV_STORE).delete('vpos_productos');
+      tx.oncomplete=()=>res();
+      tx.onerror=e=>rej(e.target.error);
+    });
+    log('✅ Listo. Caché local borrada.');
+    log('Ahora abre index.html (tu app principal) — descargará tu inventario limpio desde Supabase automáticamente.');
+  }catch(e){
+    log('❌ Error: '+e.message);
+  }
+  btn.disabled=false;
+}
+</script>
+</body>
+</html>
