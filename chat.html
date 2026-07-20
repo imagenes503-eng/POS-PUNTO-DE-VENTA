@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#16a34a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<title>Despensa Económica — Chat del Equipo</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --g:#16a34a;--gd:#15803d;--g9:#052e16;--gl:#dcfce7;--gm:#bbf7d0;--bd:#bbf7d0;
+    --bg:#f0fdf4;--sf:#fff;--tx:#052e16;--mt:#4b7a5a;--r:16px;--rs:10px;
+    --sh:0 2px 12px rgba(22,163,74,.10);--shl:0 8px 32px rgba(22,163,74,.18);
+    --red:#dc2626;--red-l:#fef2f2;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:var(--bg);font-family:'Nunito',sans-serif;font-weight:700;color:var(--tx);display:flex;flex-direction:column;overflow:hidden;}
+
+  /* NAV */
+  nav{background:linear-gradient(135deg,var(--gd),var(--g));padding:0 14px;display:flex;align-items:center;justify-content:space-between;height:60px;flex-shrink:0;box-shadow:0 2px 14px rgba(22,163,74,.35);z-index:50;}
+  .nav-left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .back-btn{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);border-radius:10px;color:#fff;width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;cursor:pointer;}
+  .nav-title{min-width:0;}
+  .nav-title h1{font-size:16px;color:#fff;font-weight:900;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .nav-title .sub{font-size:10.5px;color:rgba(255,255,255,.8);font-weight:700;display:flex;align-items:center;gap:4px;}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;box-shadow:0 0 0 rgba(74,222,128,.6);animation:pulseLive 2s infinite;}
+  @keyframes pulseLive{0%{box-shadow:0 0 0 0 rgba(74,222,128,.55);}70%{box-shadow:0 0 0 6px rgba(74,222,128,0);}100%{box-shadow:0 0 0 0 rgba(74,222,128,0);}}
+  .del-btn{background:rgba(0,0,0,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:10px;color:#fff;padding:8px 10px;font-size:15px;cursor:pointer;flex-shrink:0;}
+
+  /* CHAT AREA */
+  #chatArea{flex:1;overflow-y:auto;padding:16px 12px 10px;display:flex;flex-direction:column;gap:10px;}
+  .msg-row{display:flex;flex-direction:column;max-width:80%;}
+  .msg-row.mine{align-self:flex-end;align-items:flex-end;}
+  .msg-row.theirs{align-self:flex-start;align-items:flex-start;}
+  .msg-sender{font-size:10.5px;color:var(--mt);font-weight:800;margin:0 4px 3px;}
+  .bubble{padding:9px 13px;border-radius:16px;font-size:14px;font-weight:700;line-height:1.4;word-break:break-word;box-shadow:var(--sh);}
+  .msg-row.mine .bubble{background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;border-bottom-right-radius:4px;}
+  .msg-row.theirs .bubble{background:#fff;color:var(--tx);border:1.5px solid var(--bd);border-bottom-left-radius:4px;}
+  .bubble.locked{font-style:italic;opacity:.75;}
+  .msg-time{font-size:9.5px;color:var(--mt);font-weight:700;margin:3px 4px 0;}
+  .empty-state{margin:auto;text-align:center;color:var(--mt);padding:20px;}
+  .empty-state .ic{font-size:40px;margin-bottom:10px;}
+  .empty-state b{color:var(--tx);}
+
+  /* INPUT BAR */
+  #inputBar{flex-shrink:0;background:#fff;border-top:2px solid var(--bd);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;}
+  #msgInput{flex:1;resize:none;max-height:100px;padding:11px 14px;border:2px solid var(--bd);border-radius:18px;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;color:var(--tx);outline:none;line-height:1.35;}
+  #msgInput:focus{border-color:var(--g);}
+  #sendBtn{background:var(--g);border:none;border-radius:50%;width:44px;height:44px;flex-shrink:0;color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:var(--sh);}
+  #sendBtn:disabled{opacity:.5;}
+
+  /* BANNER cifrado */
+  .enc-banner{background:var(--gl);border-bottom:1px solid var(--bd);padding:7px 14px;font-size:10.5px;color:var(--gd);font-weight:800;text-align:center;flex-shrink:0;}
+
+  /* OVERLAYS / MODALES */
+  .overlay{position:fixed;inset:0;background:rgba(5,46,22,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;}
+  .overlay.open{display:flex;}
+  .modal-box{background:#fff;border-radius:var(--r);max-width:400px;width:100%;box-shadow:var(--shl);overflow:hidden;}
+  .modal-head{padding:18px 20px 14px;border-bottom:1px solid var(--bd);}
+  .modal-head h3{font-size:17px;color:var(--gd);}
+  .modal-body{padding:18px 20px;}
+  .modal-body p{font-size:13px;color:var(--mt);line-height:1.55;margin-bottom:12px;}
+  .modal-body input{width:100%;padding:12px 14px;border:2px solid var(--bd);border-radius:var(--rs);font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;color:var(--tx);outline:none;margin-bottom:6px;}
+  .modal-body input:focus{border-color:var(--g);}
+  .modal-foot{padding:14px 20px 20px;display:flex;gap:10px;}
+  .btn{flex:1;padding:13px;border:none;border-radius:var(--rs);font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;}
+  .btn-green{background:var(--g);color:#fff;}
+  .btn-red{background:var(--red);color:#fff;}
+  .btn-ghost{background:#fff;color:var(--mt);border:2px solid var(--bd);}
+  .lock-icon{font-size:38px;text-align:center;margin-bottom:6px;}
+  .warn-box{background:var(--red-l);border:1.5px solid #fecaca;border-radius:var(--rs);padding:12px 14px;font-size:12px;color:#991b1b;font-weight:700;line-height:1.5;margin-bottom:14px;}
+</style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-left">
+      <a href="index.html" class="back-btn">‹</a>
+      <div class="nav-title">
+        <h1 id="tituloTienda">💬 Chat del Equipo</h1>
+        <div class="sub"><span class="live-dot" id="liveDot" style="display:none;"></span><span id="estadoConexion">Conectando…</span></div>
+      </div>
+    </div>
+    <button class="del-btn" onclick="abrirModalBorrar()" title="Borrar conversación">🗑️</button>
+  </nav>
+
+  <div class="enc-banner">🔒 Cifrado de extremo a extremo — nadie más que tu equipo puede leer estos mensajes</div>
+
+  <div id="chatArea">
+    <div class="empty-state" id="emptyState">
+      <div class="ic">💬</div>
+      <div><b>Aún no hay mensajes</b><br>Escribe algo para empezar la conversación del equipo.</div>
+    </div>
+  </div>
+
+  <div id="inputBar" style="display:none;">
+    <textarea id="msgInput" rows="1" placeholder="Escribe un mensaje…" onkeydown="onInputKeydown(event)" oninput="autoGrow(this)"></textarea>
+    <button id="sendBtn" onclick="enviarMensaje()">➤</button>
+  </div>
+
+  <!-- ═══ Overlay: no hay sesión de POS ═══ -->
+  <div class="overlay" id="ovSinSesion">
+    <div class="modal-box">
+      <div class="modal-head"><h3>🔒 Abre el chat desde tu POS</h3></div>
+      <div class="modal-body">
+        <p>No encontré una sesión activa. Entra primero a tu Punto de Venta, inicia sesión con tu usuario, y abre el chat desde el menú.</p>
+      </div>
+      <div class="modal-foot"><a href="index.html" class="btn btn-green" style="text-decoration:none;text-align:center;display:block;">Ir al POS</a></div>
+    </div>
+  </div>
+
+  <!-- ═══ Overlay: clave del chat (cifrado) ═══ -->
+  <div class="overlay" id="ovClave">
+    <div class="modal-box">
+      <div class="modal-head"><h3>🔑 Clave de cifrado del chat</h3></div>
+      <div class="modal-body">
+        <div class="lock-icon">🔐</div>
+        <p>Esta clave la define una sola vez el encargado de la tienda y se comparte de palabra con el resto del equipo. Con ella se cifra y descifra cada mensaje — Supabase nunca ve el texto real, solo datos ilegibles.</p>
+        <p style="margin-top:-6px;">Si eres el primero en usar el chat, inventa una clave ahora. Si ya existe, pide la clave a un compañero.</p>
+        <input type="password" id="inpClave" placeholder="Clave del chat de tu tienda" autocomplete="off">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mt);font-weight:700;margin-top:4px;">
+          <input type="checkbox" id="chkRecordar" checked style="width:auto;margin:0;"> Recordar en este teléfono
+        </label>
+      </div>
+      <div class="modal-foot"><button class="btn btn-green" onclick="confirmarClave()">Entrar al chat</button></div>
+    </div>
+  </div>
+
+  <!-- ═══ Modal: borrar conversación ═══ -->
+  <div class="overlay" id="ovBorrar">
+    <div class="modal-box">
+      <div class="modal-head"><h3 style="color:var(--red);">🗑️ Borrar conversación</h3></div>
+      <div class="modal-body">
+        <div class="warn-box">
+          Esto borra <b>todos los mensajes</b> de esta tienda para <b>todo el equipo</b>, de forma permanente — en Supabase y en este teléfono. No se puede deshacer.
+        </div>
+        <p>¿Seguro que quieres continuar?</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" onclick="cerrarOverlay('ovBorrar')">Cancelar</button>
+        <button class="btn btn-red" onclick="borrarConversacion()">Sí, borrar todo</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// CHAT DEL EQUIPO — cifrado de extremo a extremo (AES-256-GCM)
+// Reutiliza exactamente la misma sesión/tienda que el POS principal
+// (mismas llaves de localStorage), así que no requiere iniciar sesión
+// de nuevo si ya usaste el POS en este navegador.
+// ══════════════════════════════════════════════════════════════════
+
+const SB_URL   = localStorage.getItem('vpos_supabaseUrl') || 'https://bmusprrznlqkgzkpyfsi.supabase.co';
+const SB_KEY   = localStorage.getItem('vpos_supabaseKey') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtdXNwcnJ6bmxxa2d6a3B5ZnNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxMjM5NDQsImV4cCI6MjA4OTY5OTk0NH0.ohhqWt0RPsg4m5r8TlQAfUuR62CiGZImMBE1FB9c-7w';
+const TIENDA_ID = localStorage.getItem('vpos_tiendaId') || '';
+let usuario = null;
+try { usuario = JSON.parse(localStorage.getItem('vpos_usuarioData') || 'null'); } catch(e) {}
+const AUTH_TOKEN = localStorage.getItem('vpos_authToken') || '';
+const REFRESH_TOKEN = localStorage.getItem('vpos_refreshToken') || '';
+
+let supa = null;
+let cryptoKey = null;
+let channel = null;
+const CLAVE_KEY = 'chatClave_' + TIENDA_ID;
+
+function $(id){ return document.getElementById(id); }
+function abrirOverlay(id){ $(id).classList.add('open'); }
+function cerrarOverlay(id){ $(id).classList.remove('open'); }
+function abrirModalBorrar(){ abrirOverlay('ovBorrar'); }
+
+// ── Arranque ──────────────────────────────────────────────────────
+(async function init(){
+  if (!TIENDA_ID || !usuario || !usuario.id) {
+    abrirOverlay('ovSinSesion');
+    return;
+  }
+
+  const nombreTienda = usuario.tienda_nombre || TIENDA_ID;
+  $('tituloTienda').textContent = '💬 Chat — ' + nombreTienda;
+
+  supa = window.supabase.createClient(SB_URL, SB_KEY);
+  if (AUTH_TOKEN) {
+    try { await supa.auth.setSession({ access_token: AUTH_TOKEN, refresh_token: REFRESH_TOKEN }); } catch(e) {}
+  }
+
+  const claveGuardada = localStorage.getItem(CLAVE_KEY);
+  if (claveGuardada) {
+    await derivarClave(claveGuardada);
+    await arrancarChat();
+  } else {
+    abrirOverlay('ovClave');
+  }
+})();
+
+async function confirmarClave(){
+  const clave = $('inpClave').value;
+  if (!clave || clave.length < 4) { alert('Escribe una clave de al menos 4 caracteres.'); return; }
+  if ($('chkRecordar').checked) localStorage.setItem(CLAVE_KEY, clave);
+  await derivarClave(clave);
+  cerrarOverlay('ovClave');
+  await arrancarChat();
+}
+
+// ── Derivar clave AES-256 a partir de la frase compartida (PBKDF2) ──
+async function derivarClave(passphrase){
+  const enc = new TextEncoder();
+  const salt = enc.encode('despensa-chat-' + TIENDA_ID); // salt fijo por tienda (no es secreto, solo evita reuso)
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  cryptoKey = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64ToBuf(b64){ const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return arr.buffer; }
+
+async function cifrarTexto(texto){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder().encode(texto);
+  const buf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, enc);
+  return { cifrado: bufToB64(buf), iv: bufToB64(iv) };
+}
+async function descifrarTexto(cifradoB64, ivB64){
+  const buf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b64ToBuf(ivB64)) }, cryptoKey, b64ToBuf(cifradoB64));
+  return new TextDecoder().decode(buf);
+}
+
+// ── Arrancar chat: cargar historial + suscribirse en vivo ──────────
+async function arrancarChat(){
+  $('inputBar').style.display = 'flex';
+  await cargarHistorial();
+  suscribirRealtime();
+}
+
+async function cargarHistorial(){
+  $('estadoConexion').textContent = 'Cargando…';
+  const { data, error } = await supa
+    .from('chat_mensajes')
+    .select('*')
+    .eq('tienda_id', TIENDA_ID)
+    .order('ts', { ascending: true })
+    .limit(300);
+
+  if (error) {
+    $('estadoConexion').textContent = 'Sin conexión';
+    return;
+  }
+  const cont = $('chatArea');
+  cont.innerHTML = '';
+  if (!data || !data.length) {
+    cont.innerHTML = `<div class="empty-state"><div class="ic">💬</div><div><b>Aún no hay mensajes</b><br>Escribe algo para empezar la conversación del equipo.</div></div>`;
+  } else {
+    for (const m of data) await pintarMensaje(m);
+    cont.scrollTop = cont.scrollHeight;
+  }
+  $('liveDot').style.display = 'inline-block';
+  $('estadoConexion').textContent = 'En vivo';
+}
+
+function suscribirRealtime(){
+  channel = supa.channel('chat_' + TIENDA_ID)
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'chat_mensajes', filter: 'tienda_id=eq.' + TIENDA_ID },
+      async (payload) => {
+        const vacio = $('emptyState');
+        if (vacio) vacio.remove();
+        await pintarMensaje(payload.new);
+        const cont = $('chatArea');
+        cont.scrollTop = cont.scrollHeight;
+      }
+    )
+    .on('postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'chat_mensajes', filter: 'tienda_id=eq.' + TIENDA_ID },
+      () => { cargarHistorial(); }
+    )
+    .subscribe((status) => {
+      $('estadoConexion').textContent = status === 'SUBSCRIBED' ? 'En vivo' : 'Conectando…';
+    });
+}
+
+async function pintarMensaje(m){
+  const esMio = m.usuario_id === usuario.id;
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (esMio ? 'mine' : 'theirs');
+
+  let texto;
+  try { texto = await descifrarTexto(m.cifrado, m.iv); }
+  catch(e) { texto = '🔒 No se pudo descifrar (clave incorrecta)'; }
+
+  const hora = new Date(m.ts).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
+  row.innerHTML = `
+    ${esMio ? '' : `<div class="msg-sender">${escapeHTML(m.usuario_nombre || 'Compañero')}</div>`}
+    <div class="bubble${texto.startsWith('🔒')?' locked':''}">${escapeHTML(texto)}</div>
+    <div class="msg-time">${hora}</div>
+  `;
+  $('chatArea').appendChild(row);
+}
+
+function escapeHTML(s){
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+// ── Enviar mensaje ──────────────────────────────────────────────────
+async function enviarMensaje(){
+  const inp = $('msgInput');
+  const texto = inp.value.trim();
+  if (!texto) return;
+  inp.value = ''; autoGrow(inp);
+
+  const { cifrado, iv } = await cifrarTexto(texto);
+  const { error } = await supa.from('chat_mensajes').insert({
+    tienda_id: TIENDA_ID,
+    usuario_id: usuario.id,
+    usuario_nombre: usuario.nombre || usuario.email || 'Sin nombre',
+    cifrado, iv
+  });
+  if (error) { alert('No se pudo enviar el mensaje. Revisa tu conexión.'); }
+}
+
+function onInputKeydown(e){
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(); }
+}
+function autoGrow(el){ el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
+
+// ── Borrar conversación (Supabase + localStorage) ──────────────────
+async function borrarConversacion(){
+  cerrarOverlay('ovBorrar');
+  const { error } = await supa.from('chat_mensajes').delete().eq('tienda_id', TIENDA_ID);
+  if (error) { alert('No se pudo borrar en el servidor. Intenta de nuevo.'); return; }
+
+  // Limpiar cualquier rastro local (no queda nada guardado del contenido)
+  localStorage.removeItem('chatMsgsCache_' + TIENDA_ID);
+
+  $('chatArea').innerHTML = `<div class="empty-state"><div class="ic">🗑️</div><div><b>Conversación borrada</b><br>No queda ningún mensaje guardado.</div></div>`;
+}
+</script>
+</body>
+</html>
