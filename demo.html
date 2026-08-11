@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo — Mini-Supabase Local</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; background:#fffbeb; color:#292524; }
+  h1 { font-size: 20px; color:#c2410c; }
+  section { background:#fff; border:1.5px solid #fde68a; border-radius:12px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:14px; margin:0 0 10px; color:#92400e; }
+  pre { background:#1c1917; color:#a7f3d0; padding:12px; border-radius:8px; font-size:12px; overflow-x:auto; white-space:pre-wrap; }
+  button { background:#ea580c; color:#fff; border:none; padding:10px 16px; border-radius:8px; font-weight:700; cursor:pointer; }
+  .alerta { background:#fef9c3; border:1.5px solid #facc15; padding:10px; border-radius:8px; margin-top:10px; font-weight:700; }
+</style>
+</head>
+<body>
+  <h1>🧪 Demo — Mini-Supabase Local (100% código nativo, sin SDKs)</h1>
+
+  <section>
+    <h2>Consola de ejecución</h2>
+    <button onclick="ejecutarDemo()">▶ Ejecutar demo completa</button>
+    <pre id="salida">Presiona el botón para correr: registrar usuario → login → crear tarea (dispara tiempo real) → guardar archivo simulado.</pre>
+    <div id="alertaTiempoReal"></div>
+  </section>
+
+  <script type="module">
+    import { db } from './db.js';
+    import { realtime } from './realtime.js';
+    import { auth } from './auth.js';
+    import { storage } from './storage.js';
+
+    const salida = document.getElementById('salida');
+    const log = (msg) => { salida.textContent += '\n' + msg; };
+
+    // ── Suscripción en tiempo real (Observer Pattern) ──
+    // Cualquier parte de la app puede hacer esto para reaccionar a
+    // cambios en una tabla — igual que supabase.channel().on(...)
+    realtime.suscribir('tareas', (evento) => {
+      const div = document.getElementById('alertaTiempoReal');
+      div.innerHTML = `<div class="alerta">🔔 Tiempo real: ${evento.tipoEvento} en "tareas" → "${evento.fila.titulo || evento.fila.id}"</div>`;
+    });
+
+    window.ejecutarDemo = async () => {
+      salida.textContent = '';
+      try {
+        // 1) Registrar usuario
+        const usuarioUnico = 'santiago_' + Date.now();
+        const usuario = await auth.registrar(usuarioUnico, '1234');
+        log(`✔ Usuario registrado: ${usuario.username} (id: ${usuario.id})`);
+
+        // 2) Iniciar sesión
+        const sesion = await auth.iniciarSesion(usuarioUnico, '1234');
+        log(`✔ Sesión iniciada. Token: ${sesion.token.slice(0, 8)}...`);
+
+        // 3) Crear una tarea → dispara el evento de tiempo real arriba
+        const tarea = await db.insertar('tareas', {
+          usuario_id: sesion.usuarioId,
+          titulo: 'Revisar inventario de la tienda',
+          completada: false
+        });
+        log(`✔ Tarea creada: "${tarea.titulo}" (esto disparó la alerta 🔔 en tiempo real arriba)`);
+
+        // 4) Guardar un "archivo" simulado (una imagen de prueba generada en memoria)
+        const blobSimulado = new Blob(['contenido-de-imagen-simulado'], { type: 'image/png' });
+        const ruta = await storage.guardarArchivo('fotos-productos', `producto_${tarea.id}.png`, blobSimulado);
+        log(`✔ Archivo guardado en almacenamiento local. Ruta: ${ruta}`);
+
+        // 5) Guardar esa ruta en la base de datos, asociada a la tarea (como harías con Supabase Storage)
+        await db.actualizar('tareas', tarea.id, { foto_ruta: ruta });
+        log(`✔ Ruta del archivo guardada en la tabla "tareas"`);
+
+        // 6) Verificar que se puede leer de vuelta
+        const tareaFinal = await db.seleccionarPorId('tareas', tarea.id);
+        log(`✔ Verificación final: ${JSON.stringify(tareaFinal, null, 2)}`);
+
+        log('\n🎉 Demo completa — todo corrió 100% local, sin ningún servidor ni SDK externo.');
+      } catch (e) {
+        log('❌ ERROR: ' + e.message);
+        console.error(e);
+      }
+    };
+  </script>
+</body>
+</html>
